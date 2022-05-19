@@ -935,8 +935,90 @@ such as `B-trees`.
 
 * **Besides reducing the volume of data that needs to be loaded from disk, columnoriented storage layouts are also good for making efficient use of CPU cycles**. For example, the query engine can `take a chunk of compressed column data that fits comfortably in the CPU’s L1 cache and iterate through it in a tight loop` (that is, with no function calls). **A CPU can execute such a loop much faster than code that requires a lot of function calls and conditions for each record that is processed**. `Column compression allows more rows from a column to fit in the same amount of L1 cache`. Operators, such as the bitwise AND and OR described previously, can be designed to operate on such chunks of compressed column data directly. This technique is known as vectorized processing [58, 49].
 
+### Index for Column Stores
+
+* Rowgroup
+    * A **rowgroup is a group of rows that are compressed into columnstore format at the same time**. A rowgroup usually contains the maximum number of rows per rowgroup, which is **1,048,576 rows**.
+
+    * For **high performance** and **high compression** rates, the columnstore index **slices the table into rowgroups**, and then compresses each rowgroup in a **column-wise manner**. The number of rows in the rowgroup **must be large enough to improve compression rates, and small enough to benefit from in-memory operations**.
+  
+* Column segment
+    * A column segment is a column of data from within the rowgroup.
+
+    * Each rowgroup contains one column segment for every column in the table.
+    * Each column segment is compressed together and stored on physical media.
+
+    * ![column_segment](./images/column_segment.png)
+
+* Clustered columnstore index
+
+    * ![clustered_columnstore_index](./images/clustered_columnstore_index.png)
+
+    * To reduce fragmentation of the column segments and improve performance, the columnstore index might store some data temporarily into a clustered index called a deltastore and a B-tree list of IDs for deleted rows. **The deltastore operations are handled behind the scenes. To return the correct query results, the clustered columnstore index combines query results from both the columnstore and the deltastore.**
+
+* Delta rowgroup
+    * **A delta rowgroup is a clustered B-tree index that's used only with columnstore indexes. It improves columnstore compression and performance by storing rows until the number of rows reaches a threshold (1,048,576 rows) and are then moved into the columnstore.**
+
+    * When a delta rowgroup reaches the maximum number of rows, it transitions from an OPEN to CLOSED state. A background process named the tuple-mover checks for closed row groups. If the process finds a closed rowgroup, it compresses the delta rowgroup and stores it into the columnstore as a COMPRESSED rowgroup.
+
+    * When a delta rowgroup has been compressed, the existing delta rowgroup transitions into TOMBSTONE state to be removed later by the tuple-mover when there is no reference to it.
+
+    * ![clustered_columnstore_index2](./images/clustered_columnstore_index2.png)
+
+    * Imagine this is a table with 2.1 million rows and six columns. Which means that there are now two rowgroups of 1,048,576 rows each and a remainder of 2848 rows, which is called a `deltagroup`. Since each rowgroup holds a minimum of 102,400 rows, the delta rowgroup is used to store all index **records remaining** until it has enough rows to create another rowgroup. You can have multiple delta rowgroups awaiting being moved to the columnstore. Multiple delta groups are stored in the delta store, and **it is actually a B-tree index used in addition to the columnstore**. Ideally, your index will have rowgroups containing close to 1 million rows as possible to reduce the overhead of scanning operations.
+
+    * Now to complicate things just one step further, there is a process that runs to move delta rowgroups from the delta store to the columnstore index called a tuple-mover process. This process checks for closed groups, meaning a group that has a maximum of 1 million records and is ready to be compressed and added to the index. As illustrated in the picture, the columnstore index now has two rowgroups that it will then divide into column segments for every column in a table. This creates six pillars of 1 million rows per rowgroup for a total of 12 column segments. Make sense? It is these column segments that are compressed individually for storage on disk. The engine takes these pillars and uses them for very highly paralleled scans of the data. You can also force the tuple-mover process by doing a reorg on your columnstore index.
+
+* **A columnstore index can provide a very high level of data compression, typically by 10 times, to significantly reduce your data warehouse storage cost**. For analytics, a columnstore index offers **an order of magnitude better performance than a B-tree index**. Columnstore indexes are the preferred data storage format for data warehousing and analytics workloads. Starting with SQL Server 2016 (13.x), you can use columnstore indexes for real-time analytics on your operational workload.
+
 ### Sort Order in Column Storage
 
 * In a `column store, it doesn’t necessarily matter in which order the rows are stored`. It’s easiest to store them in the order in which they were inserted, **since then inserting a new row just means appending to each of the column files.** However, we can choose to impose an order, like we did with `SSTables` previously, and use that as an indexing mechanism.
 
-* page 100
+* Note that **it wouldn’t make sense to sort each column independently, because then we would no longer know which items in the columns belong to the same row**. We can only reconstruct a row because we know that the kth item in one column belongs to the same row as the kth item in another column.
+
+    * **Rather, the data needs to be sorted an entire row at a time, even though it is stored by column**. The administrator of the database can choose the columns by which the table should be sorted, using their knowledge of common queries. For example, if queries often target date ranges, such as the last month, it might make sense to make date_key the first sort key. Then the query optimizer can scan only the rows from the last month, which will be much faster than scanning all rows.
+
+* A second column can determine the sort order of any rows that have the same value in the first column. For example, if date_key is the first sort key in Figure 3-10, it might make sense for product_sk to be the second sort key so that all sales for the same product on the same day are grouped together in storage. That will help queries that need to group or filter sales by product within a certain date range.
+
+* **Another advantage of sorted order is that it can help with compression of columns. If the primary sort column does not have many distinct values, then after sorting, it will have long sequences where the same value is repeated many times in a row. A simple run-length encoding, like we used for the bitmaps in Figure 3-11, could compress that column down to a few kilobytes—even if the table has billions of rows.**
+
+* That **compression effect is strongest on the first sort key**. The second and third sort keys will be more jumbled up, and thus not have such long runs of repeated values. Columns further down the sorting priority appear in essentially random order, so they probably won’t compress as well. But having the first few columns sorted is still a win overall.
+
+### Several different sort orders
+
+* A clever extension of this idea was introduced in C-Store and adopted in the commercial data warehouse Vertica [61, 62]. Different queries benefit from different sort orders, **so why not store the same data sorted in several different ways?** Data needs to be replicated to multiple machines anyway, so that you don’t lose data if one machine fails. **You might as well store that redundant data sorted in different ways so that when you’re processing a query, you can use the version that best fits the query pattern.**
+
+* **Having multiple sort orders in a column-oriented store is a bit similar to having multiple secondary indexes in a row-oriented store. But the big difference is that the row-oriented store keeps every row in one place (in the heap file or a clustered index), and secondary indexes just contain pointers to the matching rows. In a column store, there normally aren’t any pointers to data elsewhere, only columns containing values.**
+
+### Writing to Column-Oriented Storage
+
+* These optimizations make sense in data warehouses, because most of the load con‐ sists of large read-only queries run by analysts. Column-oriented storage, compres‐ sion, and sorting all help to make those **read queries faster**. **However, they have the downside of making writes more difficult.**
+
+* An update-in-place approach, `like B-trees use, is not possible with compressed columns`. If you wanted to insert a row in the middle of a sorted table, `you would most likely have to rewrite all the column files`. As rows are identified by their position within a column, the insertion has to update all columns consistently.
+
+* **Fortunately, we have already seen a good solution earlier in this chapter: LSM-trees. All writes first go to an in-memory store, where they are added to a sorted structure and prepared for writing to disk. It doesn’t matter whether the in-memory store is row-oriented or column-oriented. When enough writes have accumulated, they are merged with the column files on disk and written to new files in bulk. This is essentially what Vertica does [62].**
+
+* Queries need to `examine both the column data on disk and the recent writes in memory, and combine the two`. However, the query optimizer hides this distinction from the user. From an analyst’s point of view, data that has been modified with inserts, updates, or deletes is immediately reflected in subsequent queries.
+
+### Aggregation: Data Cubes and Materialized Views
+
+* Not every data warehouse is necessarily a column store: traditional row-oriented databases and a few other architectures are also used. However, columnar storage can be significantly faster for ad hoc analytical queries, so it is rapidly gaining popularity [51, 63].
+
+* **Another aspect of data warehouses that is worth mentioning briefly is materialized aggregates. As discussed earlier, data warehouse queries often involve an aggregate function, such as COUNT, SUM, AVG, MIN, or MAX in SQL. If the same aggregates are used by many different queries, it can be wasteful to crunch through the raw data every time. Why not cache some of the counts or sums that queries use most often?**
+
+* One way of creating such a cache is a **materialized view**. In a relational data model, it is often defined like a standard (virtual) view: a table-like object whose contents are the results of some query. The difference is that a **materialized view is an actual copy of the query results**, written to disk, whereas a **virtual view is just a shortcut for writing queries**. When you read from a virtual view, the SQL engine expands it into the view’s underlying query on the fly and then processes the expanded query.
+
+* **When the underlying data changes, a materialized view needs to be updated, because it is a denormalized copy of the data.** The database can do that automatically, but **such updates make writes more expensive, which is why materialized views are not often used in OLTP databases**. In **read-heavy data warehouses they can make more sense** (whether or not they actually improve read performance depends on the individual case).
+
+* A common special case of a materialized view is known as a data cube or OLAP cube [64]. It is a grid of aggregates grouped by different dimensions. Figure 3-12 shows an example.
+
+* ![data_cube](./images/data_cube.png)
+
+* Imagine for now that each fact has foreign keys to only two dimension tables—in Figure 3-12, these are date and product. You can now draw a two-dimensional table, with dates along one axis and products along the other. Each cell contains the aggre‐ gate (e.g., SUM) of an attribute (e.g., net_price) of all facts with that date-product combination. Then you can apply the same aggregate along each row or column and get a summary that has been reduced by one dimension (the sales by product regard‐ less of date, or the sales by date regardless of product).
+
+* In general, **facts often have more than two dimensions. In Figure 3-9 there are five dimensions: date, product, store, promotion, and customer. It’s a lot harder to imag‐ ine what a five-dimensional hypercube would look like, but the principle remains the same: each cell contains the sales for a particular date-product-store-promotion- customer combination. These values can then repeatedly be summarized along each of the dimensions.**
+
+* **The advantage of a materialized data cube is that certain queries become very fast** because they have effectively been precomputed. For example, if you want to know the total sales per store yesterday, you just need to look at the totals along the appropriate dimension—no need to scan millions of rows.
+
+* The disadvantage is that a data cube doesn’t have the same flexibility as querying the raw data. For example, there is no way of calculating which proportion of sales comes from items that cost more than $100, because the price isn’t one of the dimensions. **Most data warehouses therefore try to keep as much raw data as possible, and use aggregates such as data cubes only as a performance boost for certain queries.**
