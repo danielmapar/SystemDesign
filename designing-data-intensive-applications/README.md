@@ -889,7 +889,7 @@ such as `B-trees`.
 
 * **How can we execute this query efficiently?**
 
-* In most OLTP databases, storage is laid out in a row-oriented fashion: all the values from one row of a table are stored next to each other. Document databases are simi‐ lar: an entire document is typically stored as one contiguous sequence of bytes. You can see this in the CSV example of Figure 3-1.
+* In most OLTP databases, storage is laid out in a row-oriented fashion: all the values from one row of a table are stored next to each other. Document databases are similar: an entire document is typically stored as one contiguous sequence of bytes. You can see this in the CSV example of Figure 3-1.
 
 * In order to process a query like Example 3-1, you may have indexes on `fact_sales.date_key` and/or `fact_sales.product_sk` that tell the storage engine where to find all the sales for a particular `date` or for a `particular product`. **But then, a row-oriented storage engine still needs to load all of those rows (each consisting of over 100 attributes) from disk into memory, parse them, and filter out those that don’t meet the required conditions.** That can take a long time.
 
@@ -913,7 +913,7 @@ such as `B-trees`.
 
 * **Bitmap** indexes have traditionally been considered to work well for **low-cardinality columns**, which have a modest number of distinct values, either absolutely, or relative to the number of records that contain the data. **The extreme case of low cardinality is Boolean data (e.g., does a resident in a city have internet access?), which has two values, True and False.** Bitmap indexes use `bit arrays` (commonly called bitmaps) and answer queries by performing bitwise logical operations on these bitmaps. Bitmap indexes have a significant space and performance advantage over other structures for query of such data. **Their drawback is they are less efficient than the traditional B-tree indexes for columns whose data is frequently updated**: consequently, they are more **often employed in read-only systems that are specialized for fast query - e.g., data warehouses**, and `generally unsuitable for online transaction processing applications`.
 
-* If `n` is `very small` (for example, a country column may have approximately 200 dis tinct values), those bitmaps can be stored with `one bit per row`. But if `n` is bigger, there will be a lot of `zeros in most of the bitmaps` (we say that they are sparse). In that case, the `bitmaps` can additionally be run-length encoded, as shown at the bottom of Figure 3-11. This can make the encoding of a column remarkably compact.
+* If `n` is `very small` (for example, a country column may have approximately 200 distinct values), those bitmaps can be stored with `one bit per row`. But if `n` is bigger, there will be a lot of `zeros in most of the bitmaps` (we say that they are sparse). In that case, the `bitmaps` can additionally be run-length encoded, as shown at the bottom of Figure 3-11. This can make the encoding of a column remarkably compact.
 
 * Bitmap indexes such as these are very well suited for the kinds of queries that are common in a data warehouse. For example:
 
@@ -993,7 +993,7 @@ such as `B-trees`.
 
 ### Writing to Column-Oriented Storage
 
-* These optimizations make sense in data warehouses, because most of the load con‐ sists of large read-only queries run by analysts. Column-oriented storage, compres‐ sion, and sorting all help to make those **read queries faster**. **However, they have the downside of making writes more difficult.**
+* These optimizations make sense in data warehouses, because most of the load consists of large read-only queries run by analysts. Column-oriented storage, compression, and sorting all help to make those **read queries faster**. **However, they have the downside of making writes more difficult.**
 
 * An update-in-place approach, `like B-trees use, is not possible with compressed columns`. If you wanted to insert a row in the middle of a sorted table, `you would most likely have to rewrite all the column files`. As rows are identified by their position within a column, the insertion has to update all columns consistently.
 
@@ -1015,10 +1015,89 @@ such as `B-trees`.
 
 * ![data_cube](./images/data_cube.png)
 
-* Imagine for now that each fact has foreign keys to only two dimension tables—in Figure 3-12, these are date and product. You can now draw a two-dimensional table, with dates along one axis and products along the other. Each cell contains the aggre‐ gate (e.g., SUM) of an attribute (e.g., net_price) of all facts with that date-product combination. Then you can apply the same aggregate along each row or column and get a summary that has been reduced by one dimension (the sales by product regard‐ less of date, or the sales by date regardless of product).
+* Imagine for now that each fact has foreign keys to only two dimension tables—in Figure 3-12, these are date and product. You can now draw a two-dimensional table, with dates along one axis and products along the other. Each cell contains the aggregate (e.g., SUM) of an attribute (e.g., net_price) of all facts with that date-product combination. Then you can apply the same aggregate along each row or column and get a summary that has been reduced by one dimension (the sales by product regardless of date, or the sales by date regardless of product).
 
-* In general, **facts often have more than two dimensions. In Figure 3-9 there are five dimensions: date, product, store, promotion, and customer. It’s a lot harder to imag‐ ine what a five-dimensional hypercube would look like, but the principle remains the same: each cell contains the sales for a particular date-product-store-promotion- customer combination. These values can then repeatedly be summarized along each of the dimensions.**
+* In general, **facts often have more than two dimensions. In Figure 3-9 there are five dimensions: date, product, store, promotion, and customer. It’s a lot harder to imagine what a five-dimensional hypercube would look like, but the principle remains the same: each cell contains the sales for a particular date-product-store-promotion- customer combination. These values can then repeatedly be summarized along each of the dimensions.**
 
 * **The advantage of a materialized data cube is that certain queries become very fast** because they have effectively been precomputed. For example, if you want to know the total sales per store yesterday, you just need to look at the totals along the appropriate dimension—no need to scan millions of rows.
 
 * The disadvantage is that a data cube doesn’t have the same flexibility as querying the raw data. For example, there is no way of calculating which proportion of sales comes from items that cost more than $100, because the price isn’t one of the dimensions. **Most data warehouses therefore try to keep as much raw data as possible, and use aggregates such as data cubes only as a performance boost for certain queries.**
+
+### Summary
+
+* OLTP systems are typically user-facing, which means that they may see a huge volume of requests. In order to handle the load, applications usually only touch a small number of records in each query. The application requests records using some kind of key, and the storage engine uses an index to find the data for the requested key. Disk seek time is often the bottleneck here.
+
+* Data warehouses and similar analytic systems are less well known, because they are primarily used by business analysts, not by end users. They handle a much lower volume of queries than OLTP systems, but each query is typically very demanding, requiring many millions of records to be scanned in a short time. Disk bandwidth (not seek time) is often the bottleneck here, and column- oriented storage is an increasingly popular solution for this kind of workload.
+
+* On the OLTP side, we saw storage engines from two main schools of thought:
+    * **The log-structured school, which only permits appending to files and deleting obsolete files, but never updates a file that has been written. Bitcask, SSTables, LSM-trees, LevelDB, Cassandra, HBase, Lucene, and others belong to this group.**
+    * **The update-in-place school, which treats the disk as a set of fixed-size pages that can be overwritten. B-trees are the biggest example of this philosophy, being used in all major relational databases and also many nonrelational ones.**
+
+* Log-structured storage engines are a comparatively recent development. Their key idea is that they systematically turn random-access writes into sequential writes on disk, which enables higher write throughput due to the performance characteristics of hard drives and SSDs.
+
+* We then took a detour from the internals of storage engines to look at the high-level architecture of a typical data warehouse. This background illustrated why analytic workloads are so different from OLTP: when your queries require sequentially scan‐ ning across a large number of rows, indexes are much less relevant. Instead it becomes important to encode data very compactly, to minimize the amount of data that the query needs to read from disk. We discussed how column-oriented storage helps achieve this goal. 
+
+## Chapter 4 - Encoding and Evolution
+
+* In most cases, a change to an application’s features also requires a change to data that it stores: perhaps a new field or record type needs to be captured, or perhaps existing data needs to be presented in a new way.
+
+* The data models we discussed in Chapter 2 have different ways of coping with such change. Relational databases generally assume that all data in the database conforms to one schema: although that schema can be changed (through schema migrations; i.e., ALTER statements), there is exactly one schema in force at any one point in time. By contrast, schema-on-read (“schemaless”) databases don’t enforce a schema, so the database can contain a mixture of older and newer data formats written at different times (see “Schema flexibility in the document model” on page 39).
+
+* In this chapter we will look at several formats for encoding data, including `JSON, XML, Protocol Buffers, Thrift, and Avro`. In particular, we will look at how they `handle schema change`s and how they support systems where `old and new data and code` need to coexist. We will then discuss how those formats are used for data storage and for communication: in web services, Representational State Transfer (REST), and remote procedure calls (RPC), as well as message-passing systems such as actors and message queues.
+
+    * REST is all about a client-server relationship, where server-side data are made available through representations of data in simple formats, often JSON and XML. These representations for resources, or collections of resources, which are then potentially modifiable, with actions and relationships being made discoverable via a method known as hypermedia. Hypermedia is fundamental to REST, and is essentially just the concept of providing links to other resources.
+        * REST must be stateless: not persisting sessions between requests.
+        * Responses should declare cacheablility: helps your API scale if clients respect the rules.
+        * REST focuses on uniformity: if you’re using HTTP you should utilize HTTP features whenever possible, instead of inventing conventions.      
+
+### Formats for Encoding Data
+
+* Programs usually work with data in (at least) two different representations:
+    * In memory, data is kept in objects, structs, lists, arrays, hash tables, trees, and so on. These data structures are optimized for efficient access and manipulation by the **CPU (typically using pointers).**
+    * When you want to write data to a file or send it over the network, you have to encode it as some kind of self-contained sequence of bytes (for example, a JSON document). **Since a pointer wouldn’t make sense to any other process, this sequence-of-bytes representation looks quite different from the data structures that are normally used in memory.**
+
+* Thus, we need some kind of **translation between the two representations**. The translation from the in-memory representation to a byte sequence is called **encoding (also known as serialization or marshalling), and the reverse is called decoding (parsing, deserialization, unmarshalling).ii** 
+    * Serialization is unfortunately also used in the context of transac‐ tions (see Chapter 7), with a completely different meaning. To avoid overloading the word we’ll stick with encoding in this book, even though serialization is perhaps a more common term.
+
+### Language-Specific Formats
+
+* **Many programming languages come with built-in support for encoding in-memory objects into byte sequences. For example, Java has java.io.Serializable [1], Ruby has Marshal [2], Python has pickle [3], and so on. Many third-party libraries also exist, such as Kryo for Java [4].**
+
+* These encoding libraries are very convenient, because they allow in-memory objects to be saved and restored with minimal additional code. However, they also have a number of **deep problems**:
+
+    * The **encoding is often tied to a particular programming language**, and **reading the data in another language is very difficult**. If you store or transmit data in such an encoding, you are **committing yourself to your current programming language** for potentially a very long time, and precluding integrating your systems with those of other organizations (which may use different languages).
+
+    * In order to restore data in the same object types, the decoding process needs to be able to instantiate arbitrary classes. **This is frequently a source of security problems [5]: if an attacker can get your application to decode an arbitrary byte sequence, they can instantiate arbitrary classes, which in turn often allows them to do terrible things such as remotely executing arbitrary code [6, 7].**
+
+    * Versioning data is often an afterthought in these libraries: as they are intended for quick and easy encoding of data, **they often neglect the inconvenient problems of forward and backward compatibility.**
+
+    * Efficiency (CPU time taken to encode or decode, and the size of the encoded structure) is also often an afterthought. **For example, Java’s built-in serialization is notorious for its bad performance and bloated encoding [8].**
+
+* For these reasons it’s generally a bad idea to use your language’s built-in encoding for anything other than very transient purposes.
+
+### JSON, XML, and Binary Variants
+
+* Moving to standardized encodings that can be written and read by many programming languages, **JSON and XML are the obvious contenders**. They are widely known, widely supported, and almost as widely disliked. XML is often criticized for being too verbose and unnecessarily complicated [9]. JSON’s popularity is mainly due to its built-in support in web browsers (by virtue of being a subset of JavaScript) and simplicity relative to XML. CSV is another popular language-independent format, albeit less powerful.
+
+    * There is a lot of ambiguity around the encoding of numbers. **In XML and CSV, you cannot distinguish between a number and a string that happens to consist of digits** (except by referring to an external schema). **JSON distinguishes strings and numbers, but it doesn’t distinguish integers and floating-point numbers**, and it doesn’t specify a precision.
+
+    * This is a problem when dealing with large numbers; for example, **integers greater than 2^53 cannot be exactly represented in an IEEE 754 double-precision floating- point number, so such numbers become inaccurate when parsed in a language that uses floating-point numbers (such as JavaScript)**. An example of numbers larger than 253 occurs on Twitter, which uses a 64-bit number to identify each tweet. The JSON returned by Twitter’s API includes tweet IDs twice, once as a JSON number and once as a decimal string, to work around the fact that the numbers are not correctly parsed by JavaScript applications [10].
+
+    * **JSON and XML have good support for Unicode character strings (i.e., human-readable text), but they don’t support binary strings (sequences of bytes without a character encoding)**. Binary strings are a useful feature, so people get around this limitation by encoding the binary data as text using Base64. **The schema is then used to indicate that the value should be interpreted as Base64-encoded. This works, but it’s somewhat hacky and increases the data size by 33%.**
+        * ![base_64](./images/base_64.png)
+
+    * **There is optional schema support for both XML [11] and JSON [12]**. These schema languages are quite powerful, and thus quite complicated to learn and implement. Use of XML schemas is fairly widespread, but many JSON-based tools don’t bother using schemas. Since the correct interpretation of data (such as numbers and binary strings) depends on information in the schema, applications that don’t use XML/JSON schemas need to potentially hardcode the appropriate encoding/decoding logic instead.
+
+    * CSV does not have any schema, so it is up to the application to define the meaning of each row and column. If an application change adds a new row or column, you have to handle that change manually. CSV is also a quite vague format (what happens if a value contains a comma or a newline character?). Although its escaping rules have been formally specified [13], not all parsers implement them correctly.
+
+* Despite these flaws, JSON, XML, and CSV are good enough for many purposes. It’s likely that they will remain popular, especially as data interchange formats (i.e., for sending data from one organization to another). In these situations, as long as people agree on what the format is, it often doesn’t matter how pretty or efficient the format is. **The difficulty of getting different organizations to agree on anything outweighs most other concerns.**
+
+### Binary encoding
+
+* For data that is used only internally within your organization, there is less pressure to use a lowest-common-denominator encoding format. For example, you could choose a format that is more compact or faster to parse. For a small dataset, the gains are negligible, but once you get into the terabytes, the choice of data format can have a big impact.
+
+* **JSON is less verbose than XML, but both still use a lot of space compared to binary formats.** This observation led to the development of a profusion of **binary encodings for JSON (MessagePack, BSON, BJSON, UBJSON, BISON, and Smile, to name a few)** and for **XML (WBXML and Fast Infoset, for example)**. These formats have been adopted in various niches, **but none of them are as widely adopted as the textual versions of JSON and XML.**
+
+* Some of these formats **extend the set of datatypes (e.g., distinguishing integers and floating-point numbers, or adding support for binary strings)**, but otherwise they keep the **JSON/XML data model unchanged**. In particular, since they don’t prescribe a schema, they need to include all the object field names within the encoded data. **That is, in a binary encoding of the JSON document in Example 4-1, they will need to include the strings userName, favoriteNumber, and interests somewhere.**
+
+* ![json_example](./images/json_example.png)
