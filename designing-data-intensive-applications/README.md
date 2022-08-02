@@ -1164,7 +1164,7 @@ such as `B-trees`.
 * `Thrift` has a dedicated list datatype, which is parameterized with the datatype of the list elements. This does not allow the same evolution from single-valued to multi-valued as `Protocol Buffers` does, but it has the advantage of supporting nested lists.
 
 ### Avro
-
+ 
 
 
 ### Parquet
