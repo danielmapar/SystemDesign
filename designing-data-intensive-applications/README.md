@@ -1162,3 +1162,10 @@ such as `B-trees`.
 * A curious detail of `Protocol Buffers` is that it **does not** have a `list or array datatype`, but instead has a `repeated marker` for fields (which is a third option alongside `required and optional`). As you can see in Figure 4-4, the encoding of a `repeated` field is just what it says on the tin: the same field tag simply appears multiple times in the record. This has the nice effect that **it’s okay to change an optional (single-valued) field into a repeated (multi-valued) field**. **New code reading old data sees a list with zero or one elements (depending on whether the field was present); old code reading new data sees only the last element of the list.**
 
 * `Thrift` has a dedicated list datatype, which is parameterized with the datatype of the list elements. This does not allow the same evolution from single-valued to multi-valued as `Protocol Buffers` does, but it has the advantage of supporting nested lists.
+
+### Avro
+
+
+
+### Parquet
+Read more here: https://www.upsolver.com/blog/apache-parquet-why-use
