@@ -302,13 +302,13 @@
 * An `imperative language` tells the computer to perform certain operations in a certain order. You can imagine stepping through the code `line by line`, evaluating conditions, updating variables, and deciding whether to go around the loop one more time.
 
 * In a `declarative query language`, like `SQL` or `relational algebra`, you just specify the `pattern of the data you want`—what conditions the results must meet, and how you want the data to be transformed (e.g., sorted, grouped, and aggregated)—**but not how to achieve that goal**. It is up to the database system’s query optimizer to decide which indexes and which join methods to use, and in which order to execute various parts of the query.
-    * A declarative query language is attractive because it is typically more concise and easier to work with than an imperative API. But more importantly, it also hides imple‐ mentation details of the database engine, which makes it possible for the database system to introduce performance improvements without requiring any changes to queries.
+    * A declarative query language is attractive because it is typically more concise and easier to work with than an imperative API. But more importantly, it also hides implementation details of the database engine, which makes it possible for the database system to introduce performance improvements without requiring any changes to queries.
 
 * **For example, in the imperative code shown at the beginning of this section, the list of animals appears in a particular order. If the database wants to reclaim unused disk space behind the scenes, it might need to move records around, changing the order in which the animals appear. Can the database do that safely, without breaking queries?**
 
 * **The SQL example doesn’t guarantee any particular ordering, and so it doesn’t mind if the order changes. But if the query is written as imperative code, the database can never be sure whether the code is relying on the ordering or not. The fact that SQL is more limited in functionality gives the database much more room for automatic optimizations.**
 
-* Finally, `declarative languages` often lend themselves to `parallel execution`. Today, `CPUs are getting faster by adding **more cores**, not by running at significantly higher clock speeds than before` [31]. Imperative code is very hard to parallelize across multiple cores and multiple machines, because it specifies instructions that must be performed in a particular order. **Declarative languages have a better chance of getting faster in parallel execution because they specify only the pattern of the results, not the algorithm that is used to determine the results.** The database is free to use a parallel implementation of the query language, if appropriate [32].
+* Finally, `declarative languages` often lend themselves to `parallel execution`. Today, `CPUs are getting faster by adding more cores, not by running at significantly higher clock speeds than before` [31]. Imperative code is very hard to parallelize across multiple cores and multiple machines, because it specifies instructions that must be performed in a particular order. **Declarative languages have a better chance of getting faster in parallel execution because they specify only the pattern of the results, not the algorithm that is used to determine the results.** The database is free to use a parallel implementation of the query language, if appropriate [32].
 
 ### Declarative Queries on the Web
 
@@ -374,7 +374,7 @@ Imagine what life would be like if you had to use an imperative approach. In Jav
 
 * ![graph_example](./images/graph_example.png)
 
-* There are several different, but related, ways of structuring and querying data in `graphs`. In this section we will discuss the `property graph model` (implemented by `Neo4j`, `Titan`, and `InfiniteGraph`) and the `triple-store model` (implemented by `Datomic`, `AllegroGraph`, and others). We will look at `three declarative query languages` for graphs: `Cypher`, `SPARQL`, and `Datalog`. Besides these, there are also `imperative graph query languages` such as `Gremlin` [36] and graph processing frame‐ works like Pregel (see Chapter 10).
+* There are several different, but related, ways of structuring and querying data in `graphs`. In this section we will discuss the `property graph model` (implemented by `Neo4j`, `Titan`, and `InfiniteGraph`) and the `triple-store model` (implemented by `Datomic`, `AllegroGraph`, and others). We will look at `three declarative query languages` for graphs: `Cypher`, `SPARQL`, and `Datalog`. Besides these, there are also `imperative graph query languages` such as `Gremlin` [36] and graph processing frameworks like Pregel (see Chapter 10).
 
 ### Property Graphs Model
 
@@ -487,7 +487,7 @@ Imagine what life would be like if you had to use an imperative approach. In Jav
 
 ### Graph Databases Compared to the Network Model
 
-* In “Are Document Databases Repeating History?” on page 36 we discussed how CODASYL and the relational model competed to solve the problem of many-to- many relationships in IMS. At first glance, CODASYL’s network model looks similar to the graph model. Are graph databases the second coming of CODASYL in disguise?
+* In “Are Document Databases Repeating History?” on page 36 we discussed how CODASYL and the relational model competed to solve the problem of many-to-many relationships in IMS. At first glance, CODASYL’s network model looks similar to the graph model. Are graph databases the second coming of CODASYL in disguise?
 
 * No. They differ in several important ways:
     * In CODASYL, a database had a schema that specified which record type could be nested within which other record type. **In a graph database, there is no such restriction: any vertex can have an edge to any other vertex. This gives much greater flexibility for applications to adapt to changing requirements.**
@@ -610,6 +610,7 @@ such as `B-trees`.
         * If the **database is restarted**, the `in-memory` **hash maps are lost**. In principle, you can restore each segment’s hash map by reading the entire segment file from beginning to end and noting the offset of the most recent value for every key as you go along. However, that might take a long time if the segment files are large, which would make server restarts painful. **Bitcask speeds up recovery by storing a snapshot of each segment’s hash map on disk, which can be loaded into memory more quickly.**
     * Partially written records
         * The database may crash at any time, including **halfway through appending a record to the log**. `Bitcask` files include `checksums`, allowing such corrupted parts of the log to be detected and ignored.
+            * `Checksum`: The simplest `checksum` algorithm is the so-called longitudinal parity check, which breaks the data into "words" with a fixed number n of bits, and then computes the exclusive or `(XOR) of all those words`. The result is appended to the message as an extra word. In simpler terms, this means adding a bit to the end of the word to guarantee that there is an even number of '1's. To check the integrity of a message, **the receiver computes the exclusive or of all its words, including the checksum; if the result is not a word consisting of `n zeros`**, the receiver knows a transmission error occurred.[3]
     * Concurrency control
         * As writes are appended to the `log` in a `strictly sequential order`, a common implementation choice is to have only **one writer thread**. Data file segments are `append-only and otherwise immutable`, so they can be **read concurrently by multiple threads.**
 
@@ -620,7 +621,7 @@ such as `B-trees`.
 
 * However, the hash table index also **has limitations**:
     * The **hash table must fit in memory**, so if you have a very large number of keys, you’re out of luck. In principle, you could maintain a hash map on disk, but unfortunately it is **difficult to make an on-disk hash map perform well**. It requires a `lot of random access I/O, it is expensive to grow when it becomes full`, and hash collisions require fiddly logic [5].
-    * **Range queries are not efficient**. For example, you cannot easily scan over all keys between `kitty00000` and `kitty99999` you’d have to look up each key individu‐ ally in the hash maps.
+    * **Range queries are not efficient**. For example, you cannot easily scan over all keys between `kitty00000` and `kitty99999` you’d have to look up each key individually in the hash maps.
 
 ### SSTables and LSM-Trees
 
@@ -644,6 +645,7 @@ such as `B-trees`.
     * **Fine so far—but how do you get your data to be sorted by key in the first place? Our incoming writes can occur in any order.**
 
     * Maintaining a sorted structure **on disk** is possible (see `B-Trees` on page 79), but maintaining it **in memory** is much easier. There are plenty of well-known tree data structures that you can use, such as `red-black trees` or `AVL trees` [2]. With these data structures, you can insert keys in any order and read them back in `sorted order`.
+        * In computer science, an `AVL tree` (named after inventors Adelson-Velsky and Landis) is a self-balancing binary search tree (BST). It was the first such data structure to be invented.[2] In an AVL tree, the heights of the two child subtrees of any node differ by at most one; if at any time they differ by more than one, rebalancing is done to restore this property. Lookup, insertion, and deletion all take `O(log n)` time in both the average and worst cases, where `n` is the number of nodes in the tree prior to the operation. Insertions and deletions may require the tree to be rebalanced by one or more tree rotations.
 
     * We can now make our storage engine work as follows:
 
@@ -712,10 +714,10 @@ such as `B-trees`.
 
 * B-tree optimizations
     * Instead of overwriting pages and maintaining a `WAL for crash recovery`, some databases `(like LMDB) use a copy-on-write scheme` [21]. A modified page is written to a `different location`, and a `new version of the parent pages in the tree is created, pointing at the new location`. This approach is also useful for concurrency control, as we shall see in “Snapshot Isolation and Repeatable Read” on page 237.
-    * We can save space in pages by not storing the `entire key`, but `abbreviating it`. Especially in pages on the `interior of the tree`, keys only need to provide enough information to act as boundaries between `key ranges`. **Packing more keys into a page allows the tree to have a higher branching factor, and thus fewer levels.**iii
+    * We can save space in pages by not storing the `entire key`, but `abbreviating it`. Especially in pages on the `interior of the tree`, keys only need to provide enough information to act as boundaries between `key ranges`. **Packing more keys into a page allows the tree to have a higher branching factor, and thus fewer levels.**
         * This variant is sometimes known as a `B+ tree`, although the optimization is so common that it often isn’t distinguished from other `B-tree` variants.
 
-    * In general, **pages can be positioned anywhere on disk**; there is nothing requiring pages with nearby key ranges to be **nearby on disk**. If a query needs to scan over a large part of the key range in sorted order, that page-by-page layout can be **inefficient**, because a **disk seek may be required for every page that is read**. Many `Btree` implementations therefore try to **lay out the tree so that leaf pages appear in sequential order on disk**. However, it’s difficult to maintain that order as the tree grows. **By contrast, since `LSM-trees` rewrite large segments of the storage in one go during merging, it’s easier for them to keep sequential keys close to each other on disk.**
+    * In general, **pages can be positioned anywhere on disk**; there is nothing requiring pages with nearby key ranges to be **nearby on disk**. If a query needs to scan over a large part of the key range in sorted order, that page-by-page layout can be **inefficient**, because a **disk seek may be required for every page that is read**. Many `B-tree` implementations therefore try to **lay out the tree so that leaf pages appear in sequential order on disk**. However, it’s difficult to maintain that order as the tree grows. **By contrast, since `LSM-trees` rewrite large segments of the storage in one go during merging, it’s easier for them to keep sequential keys close to each other on disk.**
 
     * **Additional pointers have been added to the tree. For example, each leaf page may have references to its sibling pages to the left and right, which allows scanning keys in order without jumping back to parent pages.**
 
@@ -728,7 +730,7 @@ such as `B-trees`.
 * Advantages of LSM-trees
     * A B-tree index must **write every piece of data at least twice: once to the write-ahead log, and once to the tree page itself (and perhaps again as pages are split)**. There is also overhead from having to write an **entire page at a time, even if only a few bytes** in that page changed. Some storage engines even overwrite the same page twice in order to avoid ending up with a partially updated page in the event of a power failure [24, 25].
 
-    * Log-structured indexes also rewrite data multiple times due to repeated compaction and merging of SSTables. **This effect—one write to the database resulting in multiple writes to the disk over the course of the database’s lifetime—is known as write amplification**. It is of particular concern on SSDs, which can only overwrite blocks a limi‐ ted number of times before wearing out.
+    * Log-structured indexes also rewrite data multiple times due to repeated compaction and merging of SSTables. **This effect—one write to the database resulting in multiple writes to the disk over the course of the database’s lifetime—is known as write amplification**. It is of particular concern on SSDs, which can only overwrite blocks a limited number of times before wearing out.
         * In **write-heavy applications, the performance bottleneck might be the rate at which the database can write to disk.** In this case, write amplification has a direct performance cost: the more that a storage engine writes to disk, the fewer writes per second it can handle within the available disk bandwidth.
 
     * Moreover, **LSM-trees are typically able to sustain higher write throughput than B-trees**, partly because they sometimes have **lower write amplification** (although this depends on the storage engine configuration and workload), and partly because they sequentially **write compact SSTable files rather than having to overwrite several pages in the tree** [26]. This difference is particularly important on **magnetic hard drives, where sequential writes are much faster** than random writes.
@@ -774,16 +776,16 @@ such as `B-trees`.
 
     * The most common type of **multi-column index is called a concatenated index**, which simply **combines several fields into one key by appending one column to another (the index definition specifies in which order the fields are concatenated)**. This is like an old-fashioned paper phone book, which provides an index from (lastname, first name) to phone number. Due to the sort order, **the index can be used to find all the people with a particular last name, or all the people with a particular lastname-firstname combination. However, the index is useless if you want to find all the people with a particular first name.**
 
-    * **Multi-dimensional indexes are a more general way of querying several columns at once, which is particularly important for geospatial data**. For example, a restaurant- search website may have a database containing the latitude and longitude of each res‐ taurant. When a user is looking at the restaurants on a map, the website needs to search for all the restaurants within the rectangular map area that the user is currently viewing. This requires a two-dimensional range query like the following:
+    * **Multi-dimensional indexes are a more general way of querying several columns at once, which is particularly important for geospatial data**. For example, a restaurant search website may have a database containing the latitude and longitude of each res‐ taurant. When a user is looking at the restaurants on a map, the website needs to search for all the restaurants within the rectangular map area that the user is currently viewing. This requires a two-dimensional range query like the following:
 
     * ![multi-dimensional-index](./images/multi-dimensional-index.png)
 
-    * A standard **B-tree or LSM-tree index is not able to answer that kind of query efficiently**: it can give you either all the restaurants in a range of `latitudes` (but at any lon‐ gitude), or all the restaurants in a range of `longitudes` (but anywhere between the North and South poles), but not both simultaneously.
+    * A standard **B-tree or LSM-tree index is not able to answer that kind of query efficiently**: it can give you either all the restaurants in a range of `latitudes` (but at any longitude), or all the restaurants in a range of `longitudes` (but anywhere between the North and South poles), but not both simultaneously.
 
     * One option is to **translate a two-dimensional location into a single number using a space-filling curve, and then to use a regular B-tree index** [34]. More commonly, **specialized spatial indexes such as R-trees are used**. For example, PostGIS implements geospatial indexes as **R-trees using PostgreSQL’s Generalized Search Tree indexing** facility [35]. We don’t have space to describe R-trees in detail here, but there is plenty of literature on them.
         * `R-trees` (also Quad-trees) are tree data structures used for spatial access methods, i.e., for indexing **multi-dimensional information such as geographical coordinates**, rectangles or polygons. The R-tree was proposed by Antonin Guttman in 1984 and has found significant use in both theoretical and applied contexts.
     
-    * An interesting idea is that `multi-dimensional` indexes **are not just for geographic locations**. For example, on an ecommerce website you could use a `three-dimensional index on the dimensions (red, green, blue)` to search for products in a certain range of colors, or in a database of weather observations you could have a `two-dimensional index on (date, temperature)` in order to efficiently search for all the observations during the year 2013 where the temperature was between 25 and 30°C. **With a one dimensional index, you would have to either scan over all the records from 2013 (regardless of temperature) and then filter them by temperature**, or vice versa. **A 2D index could narrow down by timestamp and temperature simultaneously. This tech‐ nique is used by HyperDex** [36].
+    * An interesting idea is that `multi-dimensional` indexes **are not just for geographic locations**. For example, on an ecommerce website you could use a `three-dimensional index on the dimensions (red, green, blue)` to search for products in a certain range of colors, or in a database of weather observations you could have a `two-dimensional index on (date, temperature)` in order to efficiently search for all the observations during the year 2013 where the temperature was between 25 and 30°C. **With a one dimensional index, you would have to either scan over all the records from 2013 (regardless of temperature) and then filter them by temperature**, or vice versa. **A 2D index could narrow down by timestamp and temperature simultaneously. This technique is used by HyperDex** [36].
         * The main techniques `HyperDex` uses are `hyperspace hashing` and `value-dependent chaining`. HyperDex has a commercial extension called HyperDex Warp, which supports ACID transactions involving multiple objects. If not specified, "HyperDex" refers to the basic version without warp.
     
 * Full-text search and fuzzy indexes
