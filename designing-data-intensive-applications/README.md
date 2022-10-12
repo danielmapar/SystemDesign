@@ -96,7 +96,7 @@
 
     * People often talk of a dichotomy between `scaling up` (vertical scaling, moving to a more powerful machine) and `scaling out` (horizontal scaling, distributing the load across multiple smaller machines). Distributing load across multiple machines is also known as a shared-nothing architecture. A system that can run on a single machine is often simpler, but high-end machines can become very expensive, so very intensive workloads often can’t avoid scaling out. In reality, good architectures usually involve a pragmatic mixture of approaches: for example, using several fairly powerful machines can still be simpler and cheaper than a large number of small virtual machines.
 
-    * While distributing stateless services across multiple machines is fairly straightforward, taking stateful data systems from a single node to a distributed setup can intro‐ duce a lot of additional complexity. For this reason, common wisdom until recently was to keep your database on a single node (scale up) until scaling cost or high- availability requirements forced you to make it distributed.
+    * While distributing stateless services across multiple machines is fairly straightforward, taking stateful data systems from a single node to a distributed setup can introduce a lot of additional complexity. For this reason, common wisdom until recently was to keep your database on a single node (scale up) until scaling cost or high-availability requirements forced you to make it distributed.
 
     * **As the tools and abstractions for distributed systems get better, this common wisdom may change, at least for some kinds of applications. It is conceivable that distributed data systems will become the default in the future, even for use cases that don’t handle large volumes of data or traffic.** 
 
@@ -145,15 +145,15 @@
         * For example, high-level programming languages are abstractions that hide machine code, CPU registers, and syscalls. SQL is an abstraction that hides complex on-disk and in-memory data structures, concurrent requests from other clients, and inconsistencies after crashes.
 
 * Evolvability: Making Change Easy
-    * It’s extremely unlikely that your system’s requirements will remain unchanged for‐ ever. They are much more likely to be in constant flux: you learn new facts, previously unanticipated use cases emerge, business priorities change, users request new features, new platforms replace old platforms, legal or regulatory requirements change, growth of the system forces architectural changes, etc.
+    * It’s extremely unlikely that your system’s requirements will remain unchanged forever. They are much more likely to be in constant flux: you learn new facts, previously unanticipated use cases emerge, business priorities change, users request new features, new platforms replace old platforms, legal or regulatory requirements change, growth of the system forces architectural changes, etc.
 
-    * **The Agile community has also developed technical tools and pat‐ terns that are helpful when developing software in a frequently changing environment, such as test-driven development (TDD) and refactoring.**
+    * **The Agile community has also developed technical tools and patterns that are helpful when developing software in a frequently changing environment, such as test-driven development (TDD) and refactoring.**
 
 ## Chapter 2 - Data Models and Query Languages
 
 * Data models are perhaps the most important part of developing software, because they have such a profound effect: not only on how the software is written, but also on how we think about the problem that we are solving.
 
-* In this chapter we will look at a range of general-purpose data models for data stor‐ age and querying (point 2 in the preceding list). In particular, we will compare the relational model, the document model, and a few graph-based data models. We will also look at various query languages and compare their use cases. In Chapter 3 we will discuss how storage engines work; that is, how these data models are actually implemented (point 3 in the list).
+* In this chapter we will look at a range of general-purpose data models for data storage and querying (point 2 in the preceding list). In particular, we will compare the relational model, the document model, and a few graph-based data models. We will also look at various query languages and compare their use cases. In Chapter 3 we will discuss how storage engines work; that is, how these data models are actually implemented (point 3 in the list).
 
 ### Relational Model Versus Document Model
 * The best-known data model today is probably that of SQL, based on the relational model proposed by Edgar Codd in 1970 [1]: data is organized into relations (called tables in SQL), where each relation is an unordered collection of tuples (rows in SQL).
@@ -187,11 +187,11 @@
 
 * Later versions of the SQL standard added support for `structured datatypes and XML data`; this allowed multi-valued data to be stored within a single row, with support for querying and indexing inside those documents. These features are supported to varying degrees by `Oracle, IBM DB2, MS SQL Server, and PostgreSQL` [6, 7]. A **JSON datatype is also supported by several databases**, including IBM DB2, MySQL, and PostgreSQL [8].
 
-* A third option is to encode jobs, education, and contact info as a `JSON or XML` document, store it on a text column in the database, and let the application inter‐ pret its structure and content. In this setup, you typically cannot use the database to query for values inside that encoded column.
+* A third option is to encode jobs, education, and contact info as a `JSON or XML` document, store it on a text column in the database, and let the application interpret its structure and content. In this setup, you typically cannot use the database to query for values inside that encoded column.
 
 * For a data structure like a résumé, which is mostly a self-contained document, a JSON representation can be quite appropriate: see Example 2-1. `JSON` has the appeal of being much simpler than `XML`. **Document-oriented databases like MongoDB [9], RethinkDB [10], CouchDB [11], and Espresso [12] support this data model**.
     * Some developers feel that the `JSON` model reduces the **impedance mismatch** between the application code and the storage layer. However, as we shall see in Chapter 4, there are also problems with JSON as a data encoding format. The lack of a schema is often cited as an advantage; we will discuss this in “Schema flexibility in the document model” on page 39.
-    * The `JSON` representation has **better locality than the multi-table schema** in Figure 2-1. If you want to fetch a profile in the relational example, you need to either perform multiple queries (query each table by user_id) or perform a messy multi- way join between the users table and its subordinate tables. In the **JSON representation, all the relevant information is in one place, and one query is sufficient.**
+    * The `JSON` representation has **better locality than the multi-table schema** in Figure 2-1. If you want to fetch a profile in the relational example, you need to either perform multiple queries (query each table by user_id) or perform a messy multiway join between the users table and its subordinate tables. In the **JSON representation, all the relevant information is in one place, and one query is sufficient.**
 
 ### Many-to-One and Many-to-Many Relationships
 
@@ -208,7 +208,7 @@
 
 ### Are Document Databases Repeating History?
 
-* While many-to-many relationships and joins are routinely used in relational data‐ bases, document databases and NoSQL reopened the debate on how best to represent such relationships in a database. **This debate is much older than NoSQL—in fact, it goes back to the very earliest computerized database systems.
+* While many-to-many relationships and joins are routinely used in relational databases, document databases and NoSQL reopened the debate on how best to represent such relationships in a database. **This debate is much older than NoSQL—in fact, it goes back to the very earliest computerized database systems**.
 
 * The most popular database for business data processing in the 1970s was IBM’s `Information Management System (IMS)`, originally developed for `stock-keeping (SKU)` in the Apollo space program and first `commercially released in 1968` [13]. It is still in use and maintained today, `running on OS/390 on IBM mainframes` [14].
     * A `stock-keeping unit (SKU)` is a scannable bar code, most often seen printed on product labels in a retail store. The label allows vendors to automatically track the movement of inventory. The SKU is composed of an alphanumeric combination of eight-or-so characters. The characters are a code that track the price, product details, and the manufacturer. SKUs may also be applied to intangible but billable products, such as units of repair time in an auto body shop or warranties.
@@ -263,7 +263,7 @@
 
 * Most document databases, and the JSON support in relational databases, **do not enforce any schema on the data in documents**. XML support in relational databases usually comes with optional schema validation. No schema means that arbitrary keys and values can be added to a document, and when reading, clients have no guarantees as to what fields the documents may contain.
 
-* Document databases are sometimes called `schemaless`, but that’s misleading, as the code that reads the data usually assumes some kind of structure—i.e., there is an `implicit schema`, but it is not enforced by the database [20]. A more accurate term is `schema-on-read` (the structure of the data is implicit, and only interpreted when the data is read), in contrast with `schema-on-write` (the traditional approach of relational databases, where the schema is explicit and the database ensures all written data con‐ forms to it) [21].
+* Document databases are sometimes called `schemaless`, but that’s misleading, as the code that reads the data usually assumes some kind of structure—i.e., there is an `implicit schema`, but it is not enforced by the database [20]. A more accurate term is `schema-on-read` (the structure of the data is implicit, and only interpreted when the data is read), in contrast with `schema-on-write` (the traditional approach of relational databases, where the schema is explicit and the database ensures all written data conforms to it) [21].
 
 * Schema changes have a bad reputation of being slow and requiring downtime. This reputation is not entirely deserved: `most relational database systems execute the ALTER TABLE statement in a few milliseconds.` MySQL is a notable `exception`—it **copies the entire table on ALTER TABLE, which can mean minutes or even hours of downtime when altering a large table—although various tools exist to work around this limitation [24, 25, 26].**
 
@@ -276,7 +276,7 @@
 ### Data locality for queries
 
 * A document is usually stored as a `single continuous string`, encoded as `JSON, XML, or a binary variant thereof (such as MongoDB’s BSON)`. If your application often needs to access the entire document (for example, to render it on a web page), there is a `performance advantage to this storage locality`. If data is `split across multiple tables`, like in Figure 2-1, `multiple index lookups are required to retrieve it all`, which may require more disk seeks and take more time.
-    * The locality advantage only applies if you need large parts of the document at the same time. The database typically needs to load the entire document, even if you access only a small portion of it, which can be wasteful on large documents. On updates to a document, the entire document usually needs to be rewritten—only modifications that don’t change the encoded size of a document can easily be performed in place [19]
+    * The locality advantage only applies if you need large parts of the document at the same time. The database typically needs to load the entire document, even if you access only a small portion of it, which can be wasteful on large documents. **On updates to a document, the entire document usually needs to be rewritten**—only modifications that don’t change the encoded size of a document can easily be performed in place [19]
 
 * It’s worth pointing out that the idea of grouping related data together for locality is not limited to the document model. For example, `Google’s Spanner` database offers the same locality properties in a relational data model, by allowing the schema to declare that a table’s rows should be interleaved (nested) within a parent table [27]. Oracle allows the same, using a feature called multi-table index cluster tables [28]. The column-family concept in the Bigtable data model (used in Cassandra and HBase) has a similar purpose of managing locality [29].
     * Codd’s original description of the `relational model` [1] actually allowed something quite `similar to JSON documents` within a relational schema. He called it `nonsimple domains`. The idea was that a value in a row doesn’t have to just be a primitive datatype like a number or a string, but could also be a `nested relation (table)`—so you can have an arbitrarily nested tree structure as a value, much like the JSON or XML support that was `added to SQL over 30 years later`.
@@ -284,7 +284,7 @@
 ### Convergence of document and relational databases
 
 * `Most relational database systems (other than MySQL) have supported XML since the mid-2000s`. This includes functions to make local modifications to XML documents and the ability to `index and query inside XML documents`, which allows applications to use data models very similar to what they would do when using a document database.
-    * PostgreSQL since version 9.3 [8], MySQL since version 5.7, and IBM DB2 since ver‐ sion 10.5 [30] also have a similar level of support for `JSON documents`. Given the popularity of JSON for web APIs, it is likely that other relational databases will follow in their footsteps and add JSON support.
+    * PostgreSQL since version 9.3 [8], MySQL since version 5.7, and IBM DB2 since version 10.5 [30] also have a similar level of support for `JSON documents`. Given the popularity of JSON for web APIs, it is likely that other relational databases will follow in their footsteps and add JSON support.
     * On the document database side, `RethinkDB` supports relational-like joins in its query language, and some `MongoDB` drivers automatically resolve database references (effectively performing a `client-side join`, although this is likely to be slower than a join performed in the database since it requires additional network round-trips and is less optimized).
 
 ### Query Languages for Data
