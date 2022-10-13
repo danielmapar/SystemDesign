@@ -638,10 +638,15 @@ such as `B-trees`.
 * ![sstable_with_in_memory_index](./images/sstable_with_in_memory_index.png) 
     * **You still need an in-memory index to tell you the offsets for some of the keys, but it can be sparse: `one key for every few kilobytes of segment file is sufficient`, because a `few kilobytes can be scanned very quickly`.i**
         * If all keys and values had a fixed size, you could use `binary search` on a `segment file` and avoid the in-memory index entirely. However, they are usually `variable-length` in practice, which makes it difficult to tell where one record ends and the next one starts if you don’t have an index.
+        * Apparently, from reading "Expert Apache Cassandra Administration (2018)", the index file contains (by default), the offset of every 128th key in the SSTable.
+            * `Cassandra is able to binary-search for a given key up to a granularity of 128 keys blocks` and then, unfortunately, needs to `linearly scan the SSTable from that offset on` until it finds the key it's looking for.
+        * ![sstable-sparse-index](./images/sstable-sparse-index.png)
+        * ![sparse-index-2](./images/sparse-index-2.png)
+        * We can see that our sparse index only has four entries (one for each page). Now, if we want to find the row for "Rachelle," we can perform a binary search on our index to find that it falls between "Loyd" and "Shepherd." After discovering those bounds, we go to the page starting with "Loyd" and begin scanning for Rachelle's row. Notice that the data is now sorted on the right side for this example. This sorting is a limitation of the sparse index. A sparse index requires ordered data; otherwise, the scanning step would be impossible.
     * Since read requests need to scan over several `key-value` pairs in the requested range anyway, it is possible to **group those records into a block and compress it before writing it to disk** (indicated by the shaded area in Figure 3-5). Each entry of the sparse in-memory index then points at the start of a compressed block. **Besides saving disk space, compression also reduces the I/O bandwidth use.**
 
 * Constructing and maintaining `SSTables`
-
+ 
     * **Fine so far—but how do you get your data to be sorted by key in the first place? Our incoming writes can occur in any order.**
 
     * Maintaining a sorted structure **on disk** is possible (see `B-Trees` on page 79), but maintaining it **in memory** is much easier. There are plenty of well-known tree data structures that you can use, such as `red-black trees` or `AVL trees` [2]. With these data structures, you can insert keys in any order and read them back in `sorted order`.
@@ -653,7 +658,14 @@ such as `B-trees`.
         * When the `memtable` gets bigger than some threshold—typically a `few megabytes-write` it out to disk as an `SSTable` file. This can be done efficiently because the tree already maintains the `key-value pairs sorted by key`. The new `SSTable` file becomes the most recent `segment` of the database. While the `SSTable` is being written out to disk, writes can continue to a new `memtable` instance.
         * In order to serve a read request, first try to find the key in the `memtable`, then in the most recent `on-disk segment`, then in the `next-older segment`, etc.
         * From time to time, run a `merging and compaction process in the background` to combine `segment files` and to `discard overwritten or deleted values`.
-    
+
+    * We now understand how a basic `LSM tree` storage engine works:
+
+        * Writes are stored in an `in-memory tree (also known as a memtable)`. Any supporting data structures (`bloom filters` and `sparse index`) are also updated if necessary.
+        * When this tree becomes too large it is `flushed to disk` with the keys in sorted order.
+        * When a read comes in we check the `bloom filter`. If the bloom filter indicates that the value is not present then we tell the client that the key could not be found. If the bloom filter indicates that the value is present then we begin iterating over our segment files from newest to oldest.
+        * For each segment file, we check a sparse index and scan the offsets where we expect the key to be found until we find the key. We'll return the value as soon as we find it in a segment file.
+
     * This scheme works very well. It only suffers from one problem: if the database crashes, the most recent writes (which are in the `memtable` but not yet written out to `disk`) are lost. In order to avoid that problem, we can keep a `separate log on disk` to which every write is **immediately appended**, just like in the previous section. That log is **not in sorted order**, but that doesn’t matter, because its only purpose is to `restore the memtable` **after a crash**. Every time the `memtable` is written out to an `SSTable`, the corresponding **log can be discarded**.
 
 * Making an LSM-tree out of SSTables
